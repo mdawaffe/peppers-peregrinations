@@ -1,0 +1,106 @@
+#!/bin/bash
+
+rm login.token 2> /dev/null
+mkfifo login.token
+
+CLIENT_ID=$( cat id.client )
+BLOG_ID=$( cat id.blog )
+REDIRECT_URI=$( cat uri.redirect | php -r 'echo urlencode( file_get_contents( "php://stdin" ) );' )
+
+URL="https://public-api.wordpress.com/oauth2/authorize?client_id=$CLIENT_ID&redirect_uri=$REDIRECT_URI&response_type=code&blog=$BLOG_ID"
+echo "$URL" > /dev/stderr
+open "$URL"
+
+php -S 127.0.0.1:6260 &> /dev/null &
+
+PHP_PID=$!
+
+eval "$( cat login.token )"
+
+rm login.token
+
+kill -INT $PHP_PID
+
+GOOGLE_API_KEY=$( cat api.google )
+
+function getaddr() {
+	ADDRS=$( curl -s "https://maps.googleapis.com/maps/api/geocode/json?latlng=$1,$2&key=$GOOGLE_API_KEY" |
+		jshon -e results -a -e types -e 0 -u -p -p -e formatted_address -u | paste - - )
+
+	#echo "$ADDRS" > /dev/stderr
+
+	for REGION in premise natural_feature airport park point_of_interest neighborhood \
+		colloquial_area \
+		sublocality_level_5 sublocality_level_4 sublocality_level_3 sublocality_level_2 sublocality_level_1 sublocality \
+		postal_code \
+		administrative_area_level_5 administrative_area_level_4 administrative_area_level_3 administrative_area_level_2 administrative_area_level_1
+	do
+		ADDR=$( echo "$ADDRS" | grep "^$REGION" | awk -F "\t" '{print $2}' )
+		if [ -n "$ADDR" ]; then
+			echo "$ADDR"
+			return
+		fi
+	done
+}
+
+for i in $( ls *.{jpg,JPG,jpeg,JPEG} 2> /dev/null ); do
+	GEO_OP="update"
+	read DATE LAT LNG <<<$( exiftool -dateFormat '%FT%T%z' -coordFormat '%+.6f' -CreateDate -GPSLatitude -GPSLongitude -s4 -f "$i" )
+	if [ -z "$DATE" -o "-" == "$DATE" ]; then
+		DATE=$( stat -t '%FT%T%z' -f '%Sm' "$i" )
+	fi
+
+	if [ -z "$LAT" -o "-" == "$LAT" ]; then
+		LAT=""
+		GEO_OP="delete"
+	fi
+
+	if [ -z "$LNG" -o "-" == "$LNG" ]; then
+		LNG=""
+		GEO_OP="delete"
+	fi
+
+	if [ "$GEO_OP" == "update" ]; then
+		ADDR=$( getaddr "$LAT" "$LNG" )
+	else
+		ADDR=""
+	fi
+
+	echo "$i: DATE=$DATE LAT=$LAT LNG=$LNG ADDR=$ADDR"
+
+	MEDIA_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/new?fields=ID" \
+		--form "media[]=@$i" |
+		jshon -e media -e 0 -e ID -u )
+
+	if [ -z "$MEDIA_ID" ]; then
+		echo "$i Failed to Upload" > /dev/stderr
+		continue
+	fi
+
+	POST_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1/sites/$BLOG_ID/posts/new?fields=ID" \
+		--data-urlencode "content=[gallery size=full columns=1]" \
+		--data "format=image" \
+		--data-urlencode "date=$DATE" \
+		--data-urlencode "featured_image=$MEDIA_ID" \
+		--data-urlencode "metadata[geo_latitude][key]=geo_latitude" \
+		--data-urlencode "metadata[geo_latitude][value]=$LAT" \
+		--data-urlencode "metadata[geo_latitude][operation]=$GEO_OP" \
+		--data-urlencode "metadata[geo_longitude][key]=geo_longitude" \
+		--data-urlencode "metadata[geo_longitude][value]=$LNG" \
+		--data-urlencode "metadata[geo_longitude][operation]=$GEO_OP" \
+		--data-urlencode "metadata[geo_address][key]=geo_address" \
+		--data-urlencode "metadata[geo_address][value]=$ADDR" \
+		--data-urlencode "metadata[geo_address][operation]=$GEO_OP" \
+		--data "metadata[geo_public][key]=geo_public" \
+		--data "metadata[geo_public][value]=1" \
+		--data "metadata[geo_public][operation]=$GEO_OP" |
+		jshon -e ID -u )
+
+	if [ -z "$POST_ID" ]; then
+		echo "$i Failed to Post" > /dev/stderr
+		continue
+	fi
+
+	curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/$MEDIA_ID" \
+		--data-urlencode "post_ID=$POST_ID" > /dev/null
+done
