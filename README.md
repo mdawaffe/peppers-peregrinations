@@ -15,5 +15,6 @@ Usage
 =====
 
 1. Copy some images into this folder.
-2. Run `./updload`
+   * If using OS X's Photos app, do File → Export → Export Unmodified Original...
+2. Run `./upload`
 3. Delete the image copies from this folder.
