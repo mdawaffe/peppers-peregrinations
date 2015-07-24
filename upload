@@ -35,7 +35,7 @@ function getaddr() {
 		postal_code \
 		administrative_area_level_5 administrative_area_level_4 administrative_area_level_3 administrative_area_level_2 administrative_area_level_1
 	do
-		ADDR=$( echo "$ADDRS" | grep "^$REGION" | awk -F "\t" '{print $2}' )
+		ADDR=$( echo "$ADDRS" | grep "^$REGION" | head -n 1 | awk -F "\t" '{print $2}' )
 		if [ -n "$ADDR" ]; then
 			echo "$ADDR"
 			return
