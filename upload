@@ -102,5 +102,5 @@ for i in $( ls *.{jpg,JPG,jpeg,JPEG} 2> /dev/null ); do
 	fi
 
 	curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/$MEDIA_ID" \
-		--data-urlencode "post_ID=$POST_ID" > /dev/null
+		--data-urlencode "parent_id=$POST_ID" > /dev/null
 done
