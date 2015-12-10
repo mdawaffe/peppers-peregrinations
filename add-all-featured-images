@@ -1,0 +1,22 @@
+#!/bin/bash
+
+eval "$( ./login )"
+
+POST_IDS=( $( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/posts/" \
+	| jshon -e posts -a -e ID -u ) )
+
+for POST_ID in "${POST_IDS[@]}"; do
+	MEDIA_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/?post_ID=$POST_ID&mime_type=image&number=1" |
+		jshon -e media -e 0 -e ID -u )
+
+	POST_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1/sites/$BLOG_ID/posts/$POST_ID" \
+		--data "featured_image=$MEDIA_ID" |
+		jshon -e ID -u )
+
+	if [ -z "$POST_ID" ]; then
+		echo "$POST_ID: Failed to update" > /dev/stderr
+		continue
+	else
+		echo "$POST_ID: Updated" > /dev/stderr
+	fi
+done
