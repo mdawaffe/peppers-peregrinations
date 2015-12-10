@@ -2,7 +2,8 @@
 
 eval "$( ./login )"
 
-POST_IDS=( $( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/posts/" \
+# TODO: Pagination
+POST_IDS=( $( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/posts/?number=100" \
 	| jshon -e posts -a -e ID -u ) )
 
 for POST_ID in "${POST_IDS[@]}"; do
