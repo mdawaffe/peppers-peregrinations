@@ -43,7 +43,14 @@ function getaddr() {
 	done
 }
 
-for i in $( ls *.{jpg,JPG,jpeg,JPEG} 2> /dev/null ); do
+RESET=$( shopt -p nocaseglob )
+shopt -s nocaseglob
+FILES=(*.{jpg,jpeg})
+$RESET
+
+for i in "${FILES[@]}"; do
+	[ -e "$i" ] || continue
+
 	GEO_OP="update"
 	read DATE LAT LNG <<<$( exiftool -dateFormat '%FT%T%z' -coordFormat '%+.6f' -CreateDate -GPSLatitude -GPSLongitude -s4 -f "$i" )
 	if [ -z "$DATE" -o "-" == "$DATE" ]; then
