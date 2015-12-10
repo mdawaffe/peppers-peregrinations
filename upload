@@ -51,6 +51,12 @@ $RESET
 for i in "${FILES[@]}"; do
 	[ -e "$i" ] || continue
 
+	TITLE=${i%.*}
+	# /^IMG_[0-9].*$/
+	if [[ "$TITLE" == "IMG_"[[:digit:]]* ]]; then
+		TITLE=""
+	fi
+
 	GEO_OP="update"
 	read DATE LAT LNG <<<$( exiftool -dateFormat '%FT%T%z' -coordFormat '%+.6f' -CreateDate -GPSLatitude -GPSLongitude -s4 -f "$i" )
 	if [ -z "$DATE" -o "-" == "$DATE" ]; then
@@ -73,7 +79,7 @@ for i in "${FILES[@]}"; do
 		ADDR=""
 	fi
 
-	echo "$i: DATE=$DATE LAT=$LAT LNG=$LNG ADDR=$ADDR"
+	echo "$i: DATE=$DATE LAT=$LAT LNG=$LNG ADDR=$ADDR TITLE=$TITLE"
 
 	MEDIA_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/new?fields=ID" \
 		--form "media[]=@$i" |
@@ -87,6 +93,7 @@ for i in "${FILES[@]}"; do
 	POST_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1/sites/$BLOG_ID/posts/new?fields=ID" \
 		--data-urlencode "content=[gallery size=full columns=1]" \
 		--data "format=image" \
+		--data-urlencode "title=$TITLE" \
 		--data-urlencode "date=$DATE" \
 		--data-urlencode "featured_image=$MEDIA_ID" \
 		--data-urlencode "metadata[geo_latitude][key]=geo_latitude" \
