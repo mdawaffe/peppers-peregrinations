@@ -1,0 +1,38 @@
+#!/bin/bash
+
+eval "$( ./login )"
+
+# TODO: Pagination
+POST_IDS=( $( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/posts/?number=100" \
+	| jshon -e posts -a -e ID -u ) )
+
+for POST_ID in "${POST_IDS[@]}"; do
+	read MEDIA_ID WIDTH HEIGHT URL TITLE <<<$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/?post_ID=$POST_ID&mime_type=image&number=1" |
+		jshon -e media -e 0 -e ID -u -p -e width -u -p -e height -u -p -e URL -u -p -e title -u )
+
+	URL=$( echo "$URL" | php -r 'echo htmlspecialchars( file_get_contents( "php://stdin" ), ENT_QUOTES );' );
+	TITLE=$( echo "$TITLE" | php -r 'echo htmlspecialchars( file_get_contents( "php://stdin" ), ENT_QUOTES );' );
+
+	if [ -z "$MEDIA_ID" ]; then
+		echo "$POST_ID: Failed to update - no MEDIA_ID" > /dev/stderr
+		continue
+	fi
+
+	if [ 768 -lt $WIDTH ]; then
+		WIDTH_SCALED=$(( 768 ))
+		HEIGHT_SCALED=$(( 768 * $HEIGHT / $WIDTH ))
+	else
+		WIDTH_SCALED=$WIDTH
+		HEIGHT_SCALED=$HEIGHT
+	fi
+
+	CHECK_POST_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1/sites/$BLOG_ID/posts/$POST_ID" \
+		--data-urlencode "content=<a href='$URL' rel='attachment wp-att-$MEDIA_ID'><img src='$URL' alt='$TITLE' width='$WIDTH_SCALED' height='$HEIGHT_SCALED' class='aligncenter size-full wp-image-$MEDIA_ID' /></a>" |
+		jshon -e ID -u )
+
+	if [ -z "$CHECK_POST_ID" ]; then
+		echo "$POST_ID: Failed to update to MEDIA_ID=$MEDIA_ID" > /dev/stderr
+	else
+		echo "$POST_ID: Updated to MEDIA_ID=$MEDIA_ID" > /dev/stderr
+	fi
+done

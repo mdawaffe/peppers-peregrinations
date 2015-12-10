@@ -1,0 +1,19 @@
+#!/bin/bash
+
+eval "$( ./login )"
+
+# TODO: Pagination
+POST_IDS=( $( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/posts/?number=100" \
+	| jshon -e posts -a -e ID -u ) )
+
+for POST_ID in "${POST_IDS[@]}"; do
+	CHECK_POST_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1/sites/$BLOG_ID/posts/$POST_ID" \
+		--data-urlencode "content=[gallery size=full columns=1]" |
+		jshon -e ID -u )
+
+	if [ -z "$CHECK_POST_ID" ]; then
+		echo "$POST_ID: Failed to update" > /dev/stderr
+	else
+		echo "$POST_ID: Updated" > /dev/stderr
+	fi
+done
