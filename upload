@@ -62,21 +62,32 @@ for i in "${FILES[@]}"; do
 
 	echo "$i: DATE=$DATE LAT=$LAT LNG=$LNG ADDR=$ADDR TITLE=$TITLE"
 
-	MEDIA_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/new?fields=ID" \
+	read MEDIA_ID WIDTH HEIGHT URL TITLE <<<$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/new?fields=ID,width,height,URL,title" \
 		--form "media[]=@$i" |
-		jshon -e media -e 0 -e ID -u )
+		jshon -e media -e 0 -e ID -u -p -e width -u -p -e height -u -p -e URL -u -p -e title -u )
 
 	if [ -z "$MEDIA_ID" ]; then
 		echo "$i Failed to Upload" > /dev/stderr
 		continue
 	fi
 
+	URL=$( echo "$URL" | php -r 'echo htmlspecialchars( file_get_contents( "php://stdin" ), ENT_QUOTES );' );
+	TITLE=$( echo "$TITLE" | php -r 'echo htmlspecialchars( file_get_contents( "php://stdin" ), ENT_QUOTES );' );
+
+	if [ 768 -lt $WIDTH ]; then
+		WIDTH_SCALED=$(( 768 ))
+		HEIGHT_SCALED=$(( 768 * $HEIGHT / $WIDTH ))
+	else
+		WIDTH_SCALED=$WIDTH
+		HEIGHT_SCALED=$HEIGHT
+	fi
+
 	POST_ID=$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1/sites/$BLOG_ID/posts/new?fields=ID" \
-		--data-urlencode "content=[gallery size=full columns=1]" \
+		--data-urlencode "content=<a href='$URL' rel='attachment wp-att-$MEDIA_ID'><img src='$URL' alt='$TITLE' width='$WIDTH_SCALED' height='$HEIGHT_SCALED' class='aligncenter size-full wp-image-$MEDIA_ID' /></a>" \
 		--data "format=image" \
+		--data "status=private" \
 		--data-urlencode "title=$TITLE" \
 		--data-urlencode "date=$DATE" \
-		--data-urlencode "featured_image=$MEDIA_ID" \
 		--data-urlencode "metadata[geo_latitude][key]=geo_latitude" \
 		--data-urlencode "metadata[geo_latitude][value]=$LAT" \
 		--data-urlencode "metadata[geo_latitude][operation]=$GEO_OP" \
