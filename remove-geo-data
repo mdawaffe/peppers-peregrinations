@@ -1,3 +1,4 @@
 #!/bin/bash
 
 exiftool -gps:all "$1"
+exiftool -P -overwrite_original_in_place -gps:all= "$1"
