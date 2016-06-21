@@ -26,7 +26,15 @@ function getaddr() {
 
 RESET=$( shopt -p nocaseglob )
 shopt -s nocaseglob
-FILES=(*.{jpg,jpeg})
+
+# robust, but not sorted
+#FILES=(*.{jpg,jpeg})
+
+# not robust, but sorted correctly
+IFS=$'\n'
+FILES=( $( ls -1rtU *.{jpg,jpeg} 2> /dev/null ) )
+unset IFS
+
 $RESET
 
 for i in "${FILES[@]}"; do
