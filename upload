@@ -13,6 +13,7 @@ function getaddr() {
 	for REGION in premise natural_feature airport park point_of_interest neighborhood \
 		colloquial_area \
 		sublocality_level_5 sublocality_level_4 sublocality_level_3 sublocality_level_2 sublocality_level_1 sublocality \
+		locality \
 		postal_code \
 		administrative_area_level_5 administrative_area_level_4 administrative_area_level_3 administrative_area_level_2 administrative_area_level_1
 	do
