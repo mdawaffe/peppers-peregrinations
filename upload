@@ -71,8 +71,17 @@ for i in "${FILES[@]}"; do
 
 	echo "$i: DATE=$DATE LAT=$LAT LNG=$LNG ADDR=$ADDR TITLE=$TITLE"
 
-	read MEDIA_ID WIDTH HEIGHT URL TITLE <<<$( curl -sH "Authorization: BEARER $TOKEN" "https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/new?fields=ID,width,height,URL,title" \
-		--form "media[]=@$i" |
+	# File names of uploaded files should be double quoted, which requires...
+	FILE="$i"
+	FILE="${FILE//'\'/'\\'}" # ... slashes to be slash-escaped and ...
+	FILE="${FILE//'"'/'\"'}" # ... double quotes to be slash escaped. See `curl` command below
+
+	read MEDIA_ID WIDTH HEIGHT URL TITLE <<<$( curl \
+		-sH "Authorization: BEARER $TOKEN" \
+		"https://public-api.wordpress.com/rest/v1.1/sites/$BLOG_ID/media/new?fields=ID,width,height,URL,title" \
+		--form "media[]=@\"$FILE\"" |
+		# ^^^ File names with `,` or `;` must be double quoted (`media=@"FILE_NAME"`).
+		# ^^^ Double quoted file names must slash-escape double quotes and slashes.
 		jshon -e media -e 0 -e ID -u -p -e width -u -p -e height -u -p -e URL -u -p -e title -u )
 
 	if [ -z "$MEDIA_ID" ]; then
